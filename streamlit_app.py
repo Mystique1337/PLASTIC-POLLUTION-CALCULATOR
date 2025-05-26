@@ -4,8 +4,6 @@ import numpy as np
 from ultralytics import YOLO
 import tempfile
 import time
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode
-import av
 
 # Load model
 model = YOLO("best.pt")
@@ -79,31 +77,24 @@ def display_output(frame, ppi):
                   "PPI (%)": [p["ppi"] for p in ppi_history]}
     chart_placeholder.line_chart(chart_data, y="PPI (%)")
 
-
-# ✅ Webcam (browser camera) mode using streamlit-webrtc
-class VideoProcessor(VideoProcessorBase):
-    def __init__(self):
-        self.frame_area = None
-
-    def recv(self, frame):
-        img = frame.to_ndarray(format="bgr24")
-
-        if self.frame_area is None:
-            self.frame_area = img.shape[0] * img.shape[1]
-
-        processed_frame, ppi = process_frame(img, self.frame_area)
-        display_output(processed_frame, ppi)
-        return av.VideoFrame.from_ndarray(processed_frame, format="bgr24")
-
-
-# Main logic
+# Webcam Mode
 if source_type == "Webcam":
-    webrtc_streamer(
-        key="webcam",
-        mode=WebRtcMode.SENDRECV,
-        video_processor_factory=VideoProcessor,
-        media_stream_constraints={"video": True, "audio": False},
-    )
+    cap = cv2.VideoCapture(0)
+    frame_width = int(cap.get(3))
+    frame_height = int(cap.get(4))
+    frame_area = frame_width * frame_height
+
+    stop_btn = st.sidebar.button("⛔ Stop")
+
+    while cap.isOpened() and not stop_btn:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        frame, ppi = process_frame(frame, frame_area)
+        display_output(frame, ppi)
+
+    cap.release()
+    status_placeholder.info("Webcam stream ended.")
 
 # Video Upload Mode
 else:
